@@ -1,0 +1,16 @@
+[package]
+name = "ht"
+version = "0.1.0"
+authors = ["Max Gortman <mgortman@microsoft.com>"]
+
+[dependencies]
+futures = "*"
+hyper = { git = "https://github.com/hyperium/hyper" }
+serde = "*"
+serde_derive = "*"
+serde_json = "*"
+tokio-core = "0.1"
+tokio-pool = "0.1"
+native-tls = "0.1"
+tokio-tls = "0.1"
+num_cpus = "*"
