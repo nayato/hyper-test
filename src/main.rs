@@ -6,6 +6,7 @@ extern crate hyper;
 extern crate serde_json;
 extern crate native_tls;
 extern crate tokio_tls;
+extern crate num_cpus;
 
 use tokio_proto::TcpServer;
 use futures::Future;
@@ -26,6 +27,7 @@ fn main() {
     let addr: SocketAddr = "0.0.0.0:8080".parse().unwrap();
     let http_thread = std::thread::spawn(move || {
         let mut tcp = TcpServer::new(server::Http::new(), addr);
+        tcp.threads(num_cpus::get());
         tcp.serve(move || {
                 Ok(HttpService { inner: HttpServer })
             });

@@ -12,6 +12,7 @@ serde_json = "*"
 tokio-proto= "0.1"
 tokio-service = "0.1"
 native-tls = "0.1"
+num_cpus = "*"
 [dependencies.tokio-tls]
 version = "0.1"
 features = ["tokio-proto"]
