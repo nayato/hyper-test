@@ -1,53 +1,34 @@
 extern crate futures;
-extern crate tokio_core;
-extern crate tokio_pool;
-extern crate num_cpus;
+extern crate tokio_proto;
+extern crate tokio_service;
 extern crate hyper;
-#[macro_use]
-extern crate serde_derive;
+#[macro_use] extern crate serde_derive;
 extern crate serde_json;
 extern crate native_tls;
 extern crate tokio_tls;
 
-use tokio_core::net::TcpListener;
-use tokio_core::io::Io;
+use tokio_proto::TcpServer;
 use futures::Future;
 use futures::Stream;
-use hyper::server::{Service, Http};
+use tokio_service::Service;
 use hyper::server;
 use hyper::error;
 use hyper::Method::{Get, Post};
 use hyper::header::ContentLength;
-use hyper::status::StatusCode::{NotFound, Created};
+use hyper::status::StatusCode::{NotFound};
 use std::net::{SocketAddr};
-use std::hash::{Hash, Hasher};
 use native_tls::{Pkcs12};
 use std::fs::File;
 use std::io::{Read};
-use tokio_tls::{TlsAcceptorExt};
-use std::sync::Arc;
 
 fn main() {
     println!("Let's get on to it!");
     let addr: SocketAddr = "0.0.0.0:8080".parse().unwrap();
-    let (pool, join) = tokio_pool::TokioPool::new(num_cpus::get()).expect("Failed to create event loop");
-    let pool = Arc::new(pool);
-    let pool_ref = pool.clone();
-    // Use the first pool worker to listen for connections
-    pool.next_worker().spawn(move |handle| {
-        // Bind a TCP listener to our address
-        let listener = TcpListener::bind(&addr, handle).unwrap();
-        // Listen for incoming clients
-        listener.incoming().for_each(move |(socket, addr)| {
-            pool_ref.next_worker().spawn(move |handle| {
-                socket.set_nodelay(true).unwrap();
-                handle_http(addr, socket, &handle);
-                Ok(())
-                // Do work with a client socket
+    let http_thread = std::thread::spawn(move || {
+        let mut tcp = TcpServer::new(server::Http::new(), addr);
+        tcp.serve(move || {
+                Ok(HttpService { inner: HttpServer })
             });
-
-            Ok(())
-        }).map_err(|_| ()) // todo: log errors
     });
 
     let mut file = File::open("identity.pfx").unwrap();
@@ -55,56 +36,22 @@ fn main() {
     file.read_to_end(&mut pkcs12).unwrap();
     let pkcs12 = Pkcs12::from_der(&pkcs12, "password").unwrap();
     let acceptor = native_tls::TlsAcceptor::builder(pkcs12).unwrap().build().unwrap();
-    let acceptor = Arc::new(acceptor);
-    let addr_tls: SocketAddr = "0.0.0.0:8443".parse().unwrap();
-    // Use the first pool worker to listen for connections
-    let pool_ref = pool.clone();
-    pool.next_worker().spawn(move |handle| {
-        // Bind a TCP listener to our address
-        let listener = TcpListener::bind(&addr_tls, handle).unwrap();
-        // Listen for incoming clients
-        listener.incoming().for_each(move |(socket, addr)| {
-            let acceptor = acceptor.clone();
-            pool_ref.next_worker().spawn(move |elh| {
-                socket.set_nodelay(true).unwrap();
-                let remote = elh.remote().clone();
-                let handshake = acceptor.accept_async(socket);
-                let handling = handshake.and_then(move |socket| {
-                        handle_http(addr, socket, &remote.handle().expect("remote->handle failed"));
-                        Ok(())
-                    });
-                let handled = handling
-                    .map_err(|e| {
-                            println!("{}", e);
-                            // todo: handle handshake errors
-                            ()
-                        });
-                return handled;
-                // Do work with a client socket
+    let addr: SocketAddr = "0.0.0.0:8443".parse().unwrap();
+    let https_thread = std::thread::spawn(move || {
+        let tls = tokio_tls::proto::Server::new(server::Http::new(), acceptor);
+        let mut tcp = TcpServer::new(tls, addr);
+        tcp.serve(move || {
+                Ok(HttpService { inner: HttpServer })
             });
-
-            Ok(())
-        }).map_err(|e| {
-                println!("{}", e);
-                ()
-            }) // todo: log errors
     });
 
-    join.join();
-}
-
-fn handle_http<I>(addr: SocketAddr, socket: I, handle: &tokio_core::reactor::Handle) where I: Io + 'static {
-    let id = handle.id();
-    let mut hasher = std::collections::hash_map::DefaultHasher::default();
-    id.hash(&mut hasher);
-    Http::new().bind_connection(&handle, socket, addr, HttpServer { thread_id: hasher.finish() });
+    http_thread.join().unwrap();
+    https_thread.join().unwrap();
 }
 
 static INDEX: &'static [u8] = b"Hello, world!";
 
-struct HttpServer {
-    thread_id: u64
-}
+struct HttpServer;
 
 impl Service for HttpServer {
     type Request = server::Request;
@@ -116,18 +63,32 @@ impl Service for HttpServer {
             (&Get, "/plaintext") | (&Get, "/") => {
                 futures::future::ok(server::Response::new()
                         .with_header(ContentLength(INDEX.len() as u64))
-                        .with_body(INDEX)
-                        .with_status(Created))
+                        .with_body(INDEX))
                     .boxed()
             }
             (&Get, "/json") => {
-                let rep = TestResponse { message: "Hello, world!".to_string(), wid: self.thread_id };
+                //let s = String::from_utf8(vec![b'X', 250]).unwrap(); // "Hello, world!".to_string()
+                let rep = TestResponse { message: "Hello, world!".to_string() };
                 let rep_body = serde_json::to_vec(&rep).unwrap();
                 futures::future::ok(server::Response::new()
                         .with_header(ContentLength(rep_body.len() as u64))
-                        .with_body(rep_body)
-                        .with_status(Created))
+                        .with_body(rep_body))
                     .boxed()
+            }
+            (&Post, "/echo") => {
+                req.body().collect()
+                .and_then(move |chunk| {
+                    let mut buffer: Vec<u8> = Vec::new();
+                    for i in chunk {
+                        buffer.append(&mut i.to_vec());
+                    }
+                    Ok(buffer)
+                })
+                .map(move |buffer| {
+                    server::Response::new()
+                        .with_header(ContentLength(buffer.len() as u64))
+                        .with_body(buffer)
+                }).boxed()
             }
             (&Post, "/nodes") => {
                 // Get all of the chunks streamed to us in our request
@@ -164,8 +125,30 @@ impl Service for HttpServer {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+struct HttpService<T> {
+    inner: T
+}
+
+use tokio_proto::streaming::Message;
+use hyper::server::{Request, Response};
+
+impl<T, B> Service for HttpService<T>
+    where T: Service<Request=Request, Response=Response<B>, Error=hyper::Error>,
+          B: Stream<Error=hyper::Error>,
+          B::Item: AsRef<[u8]>,
+{
+    type Request = Message<server::__ProtoRequest, tokio_proto::streaming::Body<hyper::Chunk, hyper::Error>>;
+    type Response = Message<hyper::server::__ProtoResponse, B>;
+    type Error = hyper::Error;
+    type Future = futures::future::Map<T::Future, fn(Response<B>) -> Message<hyper::server::__ProtoResponse, B>>;
+
+    fn call(&self, message: Self::Request) -> Self::Future {
+        let req = Request::from(message);
+        self.inner.call(req).map(Into::into)
+    }
+}
+
+#[derive(Serialize)]
 struct TestResponse {
-    message: String,
-    wid: u64
+    message: String
 }
