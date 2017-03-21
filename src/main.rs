@@ -42,6 +42,7 @@ fn main() {
     let https_thread = std::thread::spawn(move || {
         let tls = tokio_tls::proto::Server::new(server::Http::new(), acceptor);
         let mut tcp = TcpServer::new(tls, addr);
+        tcp.threads(num_cpus::get());
         tcp.serve(move || {
                 Ok(HttpService { inner: HttpServer })
             });
