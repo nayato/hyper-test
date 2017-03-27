@@ -28,9 +28,7 @@ fn main() {
     let http_thread = std::thread::spawn(move || {
         let mut tcp = TcpServer::new(server::Http::new(), addr);
         tcp.threads(num_cpus::get());
-        tcp.serve(move || {
-                Ok(HttpService { inner: HttpServer })
-            });
+        tcp.serve(move || Ok(HttpServer));
     });
 
     let mut file = File::open("identity.pfx").unwrap();
@@ -43,9 +41,7 @@ fn main() {
         let tls = tokio_tls::proto::Server::new(server::Http::new(), acceptor);
         let mut tcp = TcpServer::new(tls, addr);
         tcp.threads(num_cpus::get());
-        tcp.serve(move || {
-                Ok(HttpService { inner: HttpServer })
-            });
+        tcp.serve(move || Ok(HttpServer));
     });
 
     http_thread.join().unwrap();
@@ -125,29 +121,6 @@ impl Service for HttpServer {
 
             }
         }
-    }
-}
-
-struct HttpService<T> {
-    inner: T
-}
-
-use tokio_proto::streaming::Message;
-use hyper::server::{Request, Response};
-
-impl<T, B> Service for HttpService<T>
-    where T: Service<Request=Request, Response=Response<B>, Error=hyper::Error>,
-          B: Stream<Error=hyper::Error>,
-          B::Item: AsRef<[u8]>,
-{
-    type Request = Message<server::__ProtoRequest, tokio_proto::streaming::Body<hyper::Chunk, hyper::Error>>;
-    type Response = Message<hyper::server::__ProtoResponse, B>;
-    type Error = hyper::Error;
-    type Future = futures::future::Map<T::Future, fn(Response<B>) -> Message<hyper::server::__ProtoResponse, B>>;
-
-    fn call(&self, message: Self::Request) -> Self::Future {
-        let req = Request::from(message);
-        self.inner.call(req).map(Into::into)
     }
 }
 
