@@ -110,7 +110,7 @@ fn run() -> std::result::Result<(), std::io::Error> {
     });
 
     let mut config = ServerConfig::new();
-    config.set_single_cert(load_certs("C:/work/nayato/ht/end.fullchain"), load_private_key("C:/work/nayato/ht/end.rsa"));
+    config.set_single_cert(load_certs("end.fullchain"), load_private_key("end.rsa"));
     let arc_config = Arc::new(config);
 
     let addr: SocketAddr = "0.0.0.0:9443".parse().unwrap();
