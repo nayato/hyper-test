@@ -56,14 +56,14 @@ impl Service for HttpServer {
             }
             (&Post, "/echo") => {
                 req.body().collect()
-                .and_then(move |chunk| {
+                .and_then(|chunk| {
                     let mut buffer: Vec<u8> = Vec::new();
                     for i in chunk {
                         buffer.append(&mut i.to_vec());
                     }
                     Ok(buffer)
                 })
-                .map(move |buffer| {
+                .map(|buffer| {
                     Response::new()
                         .with_header(ContentLength(buffer.len() as u64))
                         .with_body(buffer)
@@ -92,7 +92,7 @@ fn run() -> std::result::Result<(), std::io::Error> {
     let http_thread = std::thread::spawn(move || {
         let mut tcp = TcpServer::new(Http::new(), addr);
         tcp.threads(num_cpus::get());
-        tcp.serve(move || Ok(HttpServer));
+        tcp.serve(|| Ok(HttpServer));
     });
 
     let mut file = std::fs::File::open("identity.pfx")?;
@@ -106,7 +106,7 @@ fn run() -> std::result::Result<(), std::io::Error> {
         let tls = tokio_tls::proto::Server::new(Http::new(), acceptor);
         let mut tcp = TcpServer::new(tls, addr);
         tcp.threads(num_cpus::get());
-        tcp.serve(move || Ok(HttpServer));
+        tcp.serve(|| Ok(HttpServer));
     });
 
     let mut config = ServerConfig::new();
@@ -118,7 +118,7 @@ fn run() -> std::result::Result<(), std::io::Error> {
         let tls = tokio_rustls::proto::Server::new(Http::new(), arc_config);
         let mut tcp = TcpServer::new(tls, addr);
         tcp.threads(num_cpus::get());
-        tcp.serve(move || Ok(HttpServer));
+        tcp.serve(|| Ok(HttpServer));
     });
 
     http_thread.join().unwrap();
