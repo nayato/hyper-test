@@ -114,7 +114,7 @@ fn run() -> std::result::Result<(), std::io::Error> {
     let arc_config = Arc::new(config);
 
     let addr: SocketAddr = "0.0.0.0:9443".parse().unwrap();
-    let https_thread = std::thread::spawn(move || {
+    let rustls_thread = std::thread::spawn(move || {
         let tls = tokio_rustls::proto::Server::new(Http::new(), arc_config);
         let mut tcp = TcpServer::new(tls, addr);
         tcp.threads(num_cpus::get());
@@ -123,6 +123,7 @@ fn run() -> std::result::Result<(), std::io::Error> {
 
     http_thread.join().unwrap();
     https_thread.join().unwrap();
+    rustls_thread.join().unwrap();
     Ok(())
 }
 
