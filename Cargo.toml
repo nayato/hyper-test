@@ -15,6 +15,7 @@ native-tls = "0.1"
 num_cpus = "*"
 mime = "*"
 rustls = "*"
+url = "*"
 
 [dependencies.tokio-rustls]
 version = "*"
