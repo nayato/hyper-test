@@ -40,18 +40,12 @@ struct HttpServer;
 impl HttpServer {
     
     fn get_requested_size(&self, req: &Request) -> usize {
-        req.query()
-            .and_then(|q| form_urlencoded::parse(q.as_bytes()).into_iter().find(|x| x.0.eq_ignore_ascii_case("size")))
-            .and_then(|x| x.1.parse::<usize>().ok())
-            .unwrap_or(13) // Hello, world!
-
-        // if let Some(q) = req.query() {
-        //     if let Some((_, size_val)) = form_urlencoded::parse(q.as_bytes()).into_iter().find(|x| x.0.eq_ignore_ascii_case("size")) {
-        //         let r = size_val.parse::<usize>();
-        //         return r.unwrap_or(13);
-        //     }
-        // }
-        // 13 // Hello, world!
+        std::cmp::min(
+            INDEX.len(),
+            req.query()
+                .and_then(|q| form_urlencoded::parse(q.as_bytes()).into_iter().find(|x| x.0.eq_ignore_ascii_case("size")))
+                .and_then(|x| x.1.parse::<usize>().ok())
+                .unwrap_or(13)) // Hello, world!
     }
     
     fn get_content_str(&self, req: &Request) -> &str {
