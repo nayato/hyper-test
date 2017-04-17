@@ -22,7 +22,7 @@ version = "*"
 features = ["tokio-proto"]
 
 [dependencies.tokio-tls]
-version = "0.1"
+version = "*"
 features = ["tokio-proto"]
 
 [profile.release]
