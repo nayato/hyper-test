@@ -29,7 +29,7 @@ impl HttpServer {
         &INDEX_STR[..self.get_requested_size(req)]
     }
     
-    fn get_content_bytes(&self, req: &Request) -> &[u8] {
+    fn get_content_bytes(&self, req: &Request) -> &'static [u8] {
         &INDEX[..self.get_requested_size(req)]
     }
 }
@@ -49,7 +49,7 @@ impl Service for HttpServer {
                                .with_header(ContentLength(content.len() as u64))
                                .with_header(ContentType(mime!(Text / Plain)))
                                .with_header(Server::new(SERVER_NAME))
-                               .with_body(INDEX))
+                               .with_body(content))
                         .boxed()
             }
             (&Get, "/json") => {
