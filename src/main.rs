@@ -1,7 +1,7 @@
 extern crate futures;
 extern crate tokio_proto;
 extern crate tokio_service;
-extern crate hyper;
+#[macro_use] extern crate hyper;
 extern crate native_tls;
 extern crate tokio_tls;
 extern crate num_cpus;
