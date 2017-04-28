@@ -1,11 +1,11 @@
 extern crate futures;
 extern crate tokio_proto;
 extern crate tokio_service;
-#[macro_use] extern crate hyper;
+#[macro_use]
+extern crate hyper;
 extern crate native_tls;
 extern crate tokio_tls;
 extern crate num_cpus;
-#[macro_use]
 extern crate mime;
 #[macro_use]
 extern crate serde_derive;
@@ -31,9 +31,7 @@ fn main() {
 }
 
 fn run() -> std::result::Result<(), std::io::Error> {
-    println!("Go!");
-    let s = "abc".to_string();
-    println!("{}", s);
+    println!("Starting...", s);
 
     let addr: SocketAddr = "0.0.0.0:8080".parse().unwrap();
     let http_thread = std::thread::spawn(move || {
@@ -89,4 +87,3 @@ fn load_private_key(filename: &str) -> rustls::PrivateKey {
     assert!(keys.len() == 1);
     keys[0].clone()
 }
-
