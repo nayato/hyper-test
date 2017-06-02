@@ -1,3 +1,5 @@
+#![feature(conservative_impl_trait)]
+
 extern crate futures;
 extern crate tokio_proto;
 extern crate tokio_service;
@@ -16,13 +18,14 @@ extern crate url;
 
 use tokio_proto::TcpServer;
 use hyper::server::Http;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use native_tls::{TlsAcceptor, Pkcs12};
 use std::io::{Read, BufReader};
 use std::sync::Arc;
 use std::fs::File;
 use rustls::{Certificate, ServerConfig};
 use rustls::internal::pemfile::certs;
+use futures::{Future, Poll};
 
 mod http_server;
 
@@ -30,10 +33,50 @@ fn main() {
     run().unwrap();
 }
 
-fn run() -> std::result::Result<(), std::io::Error> {
-    println!("Starting...", s);
+fn a(switch: usize) -> impl futures::Future<Item = usize, Error = ()> {
+    match switch {
+        1 => EitherFuture::first(futures::future::ok(10usize)),
+        _ => EitherFuture::second(futures::future::ok(switch).map(|i| i+1usize))
+    } 
+}
 
-    let addr: SocketAddr = "0.0.0.0:8080".parse().unwrap();
+struct EitherFuture<T, U> {f: Option<T>, s: Option<U>}
+
+impl<T, U> EitherFuture<T, U> {
+    pub fn first(future: T) -> EitherFuture<T, U> {
+        EitherFuture::<T, U>{ f: Some(future), s: None }
+    }
+
+    pub fn second(future: U) -> EitherFuture<T, U> {
+        EitherFuture::<T, U>{ f: None, s: Some(future) }
+    }
+}
+
+impl<T, U, V, E> Future for EitherFuture<T, U>
+    where T : Future<Item = V, Error = E>, U : Future<Item = V, Error = E>
+ {
+    type Item = V;
+    type Error = E;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Some(ref mut f1) = self.f {
+            return f1.poll();
+        }
+        if let Some(ref mut s1) = self.s {
+            return s1.poll();
+        }
+        panic!("either f or s has to be set.");
+    }
+}
+
+fn run() -> std::result::Result<(), std::io::Error> {
+    println!("Starting...");
+    let s = "test string".to_string();
+    println!("{}", a(1).wait().unwrap());
+    return Ok(());
+
+    let any_ip = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
+    let addr: SocketAddr = SocketAddr::new(any_ip, 8080);
     let http_thread = std::thread::spawn(move || {
                                              let mut tcp = TcpServer::new(Http::new(), addr);
                                              tcp.threads(num_cpus::get());
@@ -46,7 +89,7 @@ fn run() -> std::result::Result<(), std::io::Error> {
     let pkcs12 = Pkcs12::from_der(&pkcs12, "password").expect("");
     let acceptor = TlsAcceptor::builder(pkcs12).unwrap().build().unwrap();
 
-    let addr: SocketAddr = "0.0.0.0:8443".parse().unwrap();
+    let addr: SocketAddr = SocketAddr::new(any_ip, 8443);
     let https_thread = std::thread::spawn(move || {
                                               let tls = tokio_tls::proto::Server::new(Http::new(),
                                                                                       acceptor);
@@ -59,7 +102,7 @@ fn run() -> std::result::Result<(), std::io::Error> {
     config.set_single_cert(load_certs("end.fullchain"), load_private_key("end.rsa"));
     let arc_config = Arc::new(config);
 
-    let addr: SocketAddr = "0.0.0.0:9443".parse().unwrap();
+    let addr: SocketAddr = SocketAddr::new(any_ip, 9443);
     let rustls_thread =
         std::thread::spawn(move || {
                                let tls = tokio_rustls::proto::Server::new(Http::new(), arc_config);
