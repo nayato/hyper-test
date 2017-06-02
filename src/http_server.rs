@@ -1,4 +1,4 @@
-use futures::{future, Future, BoxFuture, Stream};
+use futures::{future, Future, BoxFuture, Poll, Stream};
 use tokio_service::Service;
 use hyper::server::{Request, Response};
 use hyper::Method::{Get, Post};
@@ -56,40 +56,43 @@ impl Service for HttpServer {
     type Request = Request;
     type Response = Response;
     type Error = ::hyper::error::Error;
-    type Future = BoxFuture<Response, Self::Error>;
+    type Future = EitherFuture<future::FutureResult<Self::Response, Self::Error>, BoxFuture<Self::Response, Self::Error>>;
 
     fn call(&self, req: Request) -> Self::Future {
         match (req.method(), req.path()) {
             (&Get, "/plaintext") |
             (&Get, "/") => {
                 let content = self.get_content_bytes(&req);
-                future::ok(self.complete_response("text/plain", content)).boxed()
+                EitherFuture::first(future::ok(self.complete_response("text/plain", content)))
             }
             (&Get, "/json") => {
                 let content = self.get_content_str(&req);
                 let rep = TestResponse { message: content };
                 let rep_body = ::serde_json::to_vec(&rep).unwrap();
-                future::ok(self.complete_response("application/json", rep_body)).boxed()
+                EitherFuture::first(future::ok(self.complete_response("application/json", rep_body)))
             }
             (&Post, "/echo") => {
-                req.body()
-                    .collect()
-                    .and_then(|chunk| {
-                                  let mut buffer: Vec<u8> = Vec::new();
-                                  for i in chunk {
-                                      buffer.append(&mut i.to_vec());
-                                  }
-                                  Ok(buffer)
-                              })
-                    .map(|buffer| {
-                             Response::new()
-                                 .with_header(ContentLength(buffer.len() as u64))
-                                 .with_header(Server::new(SERVER_NAME))
-                                 .with_body(buffer)
-                         })
-                    .boxed()
+                //let r = 
+                EitherFuture::second(
+                    req.body()
+                        .collect()
+                        .and_then(|chunk| {
+                                    let mut buffer: Vec<u8> = Vec::new();
+                                    for i in chunk {
+                                        buffer.append(&mut i.to_vec());
+                                    }
+                                    Ok(buffer)
+                                })
+                        .map(|buffer| {
+                                Response::new()
+                                    .with_header(ContentLength(buffer.len() as u64))
+                                    .with_header(Server::new(SERVER_NAME))
+                                    .with_body(buffer)
+                            })
+                        .boxed())
+                    
             }
-            _ => future::ok(Response::new().with_status(NotFound)).boxed(),
+            _ => EitherFuture::first(future::ok(Response::new().with_status(NotFound)))
         }
     }
 }
@@ -97,4 +100,34 @@ impl Service for HttpServer {
 #[derive(Serialize)]
 struct TestResponse<'a> {
     message: &'a str,
+}
+
+
+pub struct EitherFuture<T, U> {f: Option<T>, s: Option<U>}
+
+impl<T, U> EitherFuture<T, U> {
+    pub fn first(future: T) -> EitherFuture<T, U> {
+        EitherFuture::<T, U>{ f: Some(future), s: None }
+    }
+
+    pub fn second(future: U) -> EitherFuture<T, U> {
+        EitherFuture::<T, U>{ f: None, s: Some(future) }
+    }
+}
+
+impl<T, U, V, E> Future for EitherFuture<T, U>
+    where T : Future<Item = V, Error = E>, U : Future<Item = V, Error = E>
+ {
+    type Item = V;
+    type Error = E;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        if let Some(ref mut f1) = self.f {
+            return f1.poll();
+        }
+        if let Some(ref mut s1) = self.s {
+            return s1.poll();
+        }
+        panic!("either f or s has to be set.");
+    }
 }
