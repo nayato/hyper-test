@@ -25,7 +25,6 @@ use std::sync::Arc;
 use std::fs::File;
 use rustls::{Certificate, ServerConfig};
 use rustls::internal::pemfile::certs;
-use futures::{Future, Poll};
 
 mod http_server;
 
@@ -35,9 +34,6 @@ fn main() {
 
 fn run() -> std::result::Result<(), std::io::Error> {
     println!("Starting...");
-    // let s = "test string".to_string();
-    // println!("{}", a(1).wait().unwrap());
-    // return Ok(());
 
     let any_ip = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
     let addr: SocketAddr = SocketAddr::new(any_ip, 8080);
