@@ -71,9 +71,9 @@ impl<T, U, V, E> Future for EitherFuture<T, U>
 
 fn run() -> std::result::Result<(), std::io::Error> {
     println!("Starting...");
-    let s = "test string".to_string();
-    println!("{}", a(1).wait().unwrap());
-    return Ok(());
+    // let s = "test string".to_string();
+    // println!("{}", a(1).wait().unwrap());
+    // return Ok(());
 
     let any_ip = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
     let addr: SocketAddr = SocketAddr::new(any_ip, 8080);
