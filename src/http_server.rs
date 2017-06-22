@@ -15,6 +15,8 @@ const INDEX_STR: &str = include_str!("lorem.txt");
 static INDEX: &[u8] = include_bytes!("lorem.txt");
 static SERVER_NAME: &str = "hyper";
 
+type SyncResponseFuture = future::FutureResult<Response, ::hyper::Error>;
+
 pub struct HttpServer;
 
 impl HttpServer {
@@ -54,7 +56,7 @@ impl Service for HttpServer {
     type Request = Request;
     type Response = Response;
     type Error = ::hyper::error::Error;
-    type Future = Either<future::FutureResult<Self::Response, Self::Error>, BoxFuture<Self::Response, Self::Error>>;
+    type Future = Either<SyncResponseFuture, BoxFuture<Self::Response, Self::Error>>;
 
     fn call(&self, req: Request) -> Self::Future {
         match (req.method(), req.path()) {
@@ -67,8 +69,7 @@ impl Service for HttpServer {
                 let content = self.get_content_str(&req);
                 let rep = TestResponse { message: content };
                 let rep_body = ::serde_json::to_vec(&rep).unwrap();
-                Either::A(future::ok(self.complete_response(APPLICATION_JSON,
-                                                                      rep_body)))
+                Either::A(future::ok(self.complete_response(APPLICATION_JSON, rep_body)))
             }
             (&Post, "/echo") => {
                 Either::B(
@@ -83,8 +84,7 @@ impl Service for HttpServer {
                                 })
                         .map(|buffer| {
                                 Response::new()
-                                    .with_header(ContentLength(buffer.len() as
-                                                                u64))
+                                    .with_header(ContentLength(buffer.len() as u64))
                                     .with_header(Server::new(SERVER_NAME))
                                     .with_body(buffer)
                             })

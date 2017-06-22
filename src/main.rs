@@ -62,13 +62,12 @@ fn run() -> std::result::Result<(), std::io::Error> {
     let arc_config = Arc::new(config);
 
     let addr: SocketAddr = SocketAddr::new(any_ip, 9443);
-    let rustls_thread =
-        std::thread::spawn(move || {
-                               let tls = tokio_rustls::proto::Server::new(Http::new(), arc_config);
-                               let mut tcp = TcpServer::new(tls, addr);
-                               tcp.threads(num_cpus::get());
-                               tcp.serve(|| Ok(http_server::HttpServer));
-                           });
+    let rustls_thread = std::thread::spawn(move || {
+        let tls = tokio_rustls::proto::Server::new(Http::new(), arc_config);
+        let mut tcp = TcpServer::new(tls, addr);
+        tcp.threads(num_cpus::get());
+        tcp.serve(|| Ok(http_server::HttpServer));
+    });
 
     http_thread.join().unwrap();
     https_thread.join().unwrap();
@@ -78,7 +77,7 @@ fn run() -> std::result::Result<(), std::io::Error> {
 
 fn load_certs(path: &str) -> Vec<Certificate> {
     let res = certs(&mut BufReader::new(File::open(path).unwrap())).unwrap();
-    assert!(res.len() > 0);
+    assert!(!res.is_empty());
     res
 }
 
@@ -86,6 +85,6 @@ fn load_private_key(filename: &str) -> rustls::PrivateKey {
     let keyfile = File::open(filename).expect("cannot open private key file");
     let mut reader = BufReader::new(keyfile);
     let keys = rustls::internal::pemfile::rsa_private_keys(&mut reader).unwrap();
-    assert!(keys.len() == 1);
+    assert_eq!(1, keys.len());
     keys[0].clone()
 }
