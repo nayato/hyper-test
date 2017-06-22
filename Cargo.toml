@@ -5,7 +5,7 @@ authors = ["Max Gortman <mgortman@microsoft.com>"]
 
 [dependencies]
 futures = "*"
-hyper = { git = "https://github.com/hyperium/hyper" }
+hyper = "0.11"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"
