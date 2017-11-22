@@ -4,8 +4,8 @@ version = "0.1.0"
 authors = ["Max Gortman <mgortman@microsoft.com>"]
 
 [dependencies]
-futures = "*"
-hyper = "0.11"
+futures-await = { git = 'https://github.com/alexcrichton/futures-await' }
+hyper = "*"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"
@@ -16,14 +16,8 @@ num_cpus = "*"
 mime = "*"
 rustls = "*"
 url = "*"
-
-[dependencies.tokio-rustls]
-version = "*"
-features = ["tokio-proto"]
-
-[dependencies.tokio-tls]
-version = "*"
-features = ["tokio-proto"]
+tokio-rustls = { version = "*", features = ["tokio-proto"] }
+tokio-tls = { version = "*", features = ["tokio-proto"] }
 
 [profile.release]
 debug = true

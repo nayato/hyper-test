@@ -1,4 +1,4 @@
-use futures::{future, Future, BoxFuture, Stream};
+use futures::{future, BoxFuture, Future, Stream};
 use futures::future::Either;
 use tokio_service::Service;
 use hyper::server::{Request, Response};
@@ -9,7 +9,7 @@ use url::form_urlencoded;
 use std::cmp;
 use std::ascii::AsciiExt;
 use std::ops::Deref;
-use mime::{Mime, TEXT_PLAIN, APPLICATION_JSON};
+use mime::{Mime, APPLICATION_JSON, TEXT_PLAIN};
 
 const INDEX_STR: &str = include_str!("lorem.txt");
 static INDEX: &[u8] = include_bytes!("lorem.txt");
@@ -21,15 +21,17 @@ pub struct HttpServer;
 
 impl HttpServer {
     fn get_requested_size(&self, req: &Request) -> usize {
-        cmp::min(INDEX.len(),
-                 req.query()
-                     .and_then(|q| {
-                                   form_urlencoded::parse(q.as_bytes())
-                                       .into_iter()
-                                       .find(|x| x.0.eq_ignore_ascii_case("size"))
-                               })
-                     .and_then(|x| x.1.parse::<usize>().ok())
-                     .unwrap_or(13)) // Hello, world!
+        cmp::min(
+            INDEX.len(),
+            req.query()
+                .and_then(|q| {
+                    form_urlencoded::parse(q.as_bytes())
+                        .into_iter()
+                        .find(|x| x.0.eq_ignore_ascii_case("size"))
+                })
+                .and_then(|x| x.1.parse::<usize>().ok())
+                .unwrap_or(13),
+        ) // Hello, world!
     }
 
     fn get_content_str(&self, req: &Request) -> &str {
@@ -41,7 +43,8 @@ impl HttpServer {
     }
 
     fn complete_response<T>(&self, content_type: Mime, content: T) -> Response
-        where T: Into<::hyper::Body> + Deref<Target = [u8]>,
+    where
+        T: Into<::hyper::Body> + Deref<Target = [u8]>,
     {
         Response::new()
             .with_header(ContentLength(content.len() as u64))
@@ -60,8 +63,7 @@ impl Service for HttpServer {
 
     fn call(&self, req: Request) -> Self::Future {
         match (req.method(), req.path()) {
-            (&Get, "/plaintext") |
-            (&Get, "/") => {
+            (&Get, "/plaintext") | (&Get, "/") => {
                 let content = self.get_content_bytes(&req);
                 Either::A(future::ok(self.complete_response(TEXT_PLAIN, content)))
             }
@@ -69,28 +71,29 @@ impl Service for HttpServer {
                 let content = self.get_content_str(&req);
                 let rep = TestResponse { message: content };
                 let rep_body = ::serde_json::to_vec(&rep).unwrap();
-                Either::A(future::ok(self.complete_response(APPLICATION_JSON, rep_body)))
+                Either::A(future::ok(
+                    self.complete_response(APPLICATION_JSON, rep_body),
+                ))
             }
-            (&Post, "/echo") => {
-                Either::B(
-                    req.body()
-                        .collect()
-                        .and_then(|chunk| {
-                                    let mut buffer: Vec<u8> = Vec::new();
-                                    for i in chunk {
-                                        buffer.append(&mut i.to_vec());
-                                    }
-                                    Ok(buffer)
-                                })
-                        .map(|buffer| {
-                                Response::new()
-                                    .with_header(ContentLength(buffer.len() as u64))
-                                    .with_header(Server::new(SERVER_NAME))
-                                    .with_body(buffer)
-                            })
-                        .boxed())
-            }
-            _ => Either::A(future::ok(Response::new().with_status(NotFound)))
+            (&Post, "/echo") => Either::B(
+                req.body()
+                    .collect()
+                    .and_then(|chunk| {
+                        let mut buffer: Vec<u8> = Vec::new();
+                        for i in chunk {
+                            buffer.append(&mut i.to_vec());
+                        }
+                        Ok(buffer)
+                    })
+                    .map(|buffer| {
+                        Response::new()
+                            .with_header(ContentLength(buffer.len() as u64))
+                            .with_header(Server::new(SERVER_NAME))
+                            .with_body(buffer)
+                    })
+                    .boxed(),
+            ),
+            _ => Either::A(future::ok(Response::new().with_status(NotFound))),
         }
     }
 }

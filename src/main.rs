@@ -1,25 +1,25 @@
-#![feature(conservative_impl_trait)]
+#![feature(proc_macro, conservative_impl_trait, generators, vec_resize_default)]
 
-extern crate futures;
-extern crate tokio_proto;
-extern crate tokio_service;
+extern crate futures_await as futures;
 extern crate hyper;
-extern crate native_tls;
-extern crate tokio_tls;
-extern crate num_cpus;
 extern crate mime;
+extern crate native_tls;
+extern crate num_cpus;
+extern crate rustls;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
-extern crate rustls;
+extern crate tokio_proto;
 extern crate tokio_rustls;
+extern crate tokio_service;
+extern crate tokio_tls;
 extern crate url;
 
 use tokio_proto::TcpServer;
 use hyper::server::Http;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use native_tls::{TlsAcceptor, Pkcs12};
-use std::io::{Read, BufReader};
+use native_tls::{Pkcs12, TlsAcceptor};
+use std::io::{BufReader, Read};
 use std::sync::Arc;
 use std::fs::File;
 use rustls::{Certificate, ServerConfig};
@@ -37,10 +37,10 @@ fn run() -> std::result::Result<(), std::io::Error> {
     let any_ip = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
     let addr: SocketAddr = SocketAddr::new(any_ip, 8080);
     let http_thread = std::thread::spawn(move || {
-                                             let mut tcp = TcpServer::new(Http::new(), addr);
-                                             tcp.threads(num_cpus::get());
-                                             tcp.serve(|| Ok(http_server::HttpServer));
-                                         });
+        let mut tcp = TcpServer::new(Http::new(), addr);
+        tcp.threads(num_cpus::get());
+        tcp.serve(|| Ok(http_server::HttpServer));
+    });
 
     let mut file = std::fs::File::open("identity.pfx")?;
     let mut pkcs12 = vec![];
@@ -50,12 +50,11 @@ fn run() -> std::result::Result<(), std::io::Error> {
 
     let addr: SocketAddr = SocketAddr::new(any_ip, 8443);
     let https_thread = std::thread::spawn(move || {
-                                              let tls = tokio_tls::proto::Server::new(Http::new(),
-                                                                                      acceptor);
-                                              let mut tcp = TcpServer::new(tls, addr);
-                                              tcp.threads(num_cpus::get());
-                                              tcp.serve(|| Ok(http_server::HttpServer));
-                                          });
+        let tls = tokio_tls::proto::Server::new(Http::new(), acceptor);
+        let mut tcp = TcpServer::new(tls, addr);
+        tcp.threads(num_cpus::get());
+        tcp.serve(|| Ok(http_server::HttpServer));
+    });
 
     let mut config = ServerConfig::new();
     config.set_single_cert(load_certs("end.fullchain"), load_private_key("end.rsa"));
