@@ -38,10 +38,10 @@ fn main() {
 }
 
 fn run() -> std::result::Result<(), std::io::Error> {
-    println!("Starting...");
+    let threads = num_cpus::get();
+    println!("Starting on {} threads", threads);
 
     let any_ip = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
-    let threads = num_cpus::get();
     let addr: SocketAddr = SocketAddr::new(any_ip, 10080);
     let http_threads = (0..threads).map(|_| {
         std::thread::spawn(move || {
@@ -150,9 +150,7 @@ fn listener(addr: &SocketAddr, handle: &Handle) -> std::io::Result<TcpListener> 
 #[cfg(unix)]
 fn configure_tcp(tcp: &net2::TcpBuilder) -> std::io::Result<()> {
     use net2::unix::*;
-
-    try!(tcp.reuse_port(true));
-
+    tcp.reuse_port(true)?;
     Ok(())
 }
 
