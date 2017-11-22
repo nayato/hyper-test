@@ -45,9 +45,11 @@ fn run() -> std::result::Result<(), std::io::Error> {
     let addr: SocketAddr = SocketAddr::new(any_ip, 10080);
     let http_threads = (0..threads).map(|_| {
         std::thread::spawn(move || {
+            println!("1.5");
             serve(addr, |socket| future::ok(socket))
         })
     });
+    println!("2");
     // let http_thread = std::thread::spawn(move || {
     //     let mut tcp = TcpServer::new(Http::new(), addr);
     //     tcp.threads(num_cpus::get());
@@ -61,11 +63,13 @@ fn run() -> std::result::Result<(), std::io::Error> {
         .expect("could not read TLS cert file");
     let pkcs12 = Pkcs12::from_der(&pkcs12, "password").expect("could not load TLS cert");
     let acceptor = TlsAcceptor::builder(pkcs12).unwrap().build().unwrap();
+    println!("3");
 
     let addr: SocketAddr = SocketAddr::new(any_ip, 10443);
     let https_threads = (0..threads).map(|_| {
         let acceptor = acceptor.clone();
         std::thread::spawn(move || {
+            println!("3.5");
             serve(addr, move |socket| init_tls(socket, acceptor.clone()))
         })
     });
@@ -82,6 +86,7 @@ fn run() -> std::result::Result<(), std::io::Error> {
     //     tcp.serve(|| Ok(http_server::HttpServer));
     // });
 
+    println!("4");
     for thread in https_threads.chain(http_threads) {
         thread.join().unwrap();
     }
@@ -150,11 +155,13 @@ fn listener(addr: &SocketAddr, handle: &Handle) -> std::io::Result<TcpListener> 
 #[cfg(unix)]
 fn configure_tcp(tcp: &net2::TcpBuilder) -> std::io::Result<()> {
     use net2::unix::*;
+    println!("1.1");
     tcp.reuse_port(true)?;
     Ok(())
 }
 
 #[cfg(windows)]
 fn configure_tcp(_tcp: &net2::TcpBuilder) -> std::io::Result<()> {
+    println!("1");
     Ok(())
 }

@@ -53,7 +53,6 @@ impl HttpServer {
     }
 }
 
-
 impl Service for HttpServer {
     type Request = Request;
     type Response = Response;
