@@ -9,15 +9,16 @@ hyper = "*"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"
-tokio-proto= "*"
-tokio-service = "*"
+tokio-io= "*"
+tokio-core= "*"
 native-tls = "*"
 num_cpus = "*"
 mime = "*"
 rustls = "*"
 url = "*"
-tokio-rustls = { version = "*", features = ["tokio-proto"] }
-tokio-tls = { version = "*", features = ["tokio-proto"] }
+net2 = "0.2"
+tokio-rustls = "*"
+tokio-tls = "*"
 
 [profile.release]
 debug = true
