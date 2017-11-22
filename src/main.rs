@@ -87,7 +87,8 @@ fn run() -> std::result::Result<(), std::io::Error> {
     // });
 
     println!("4");
-    for thread in https_threads.chain(http_threads) {
+    for thread in https_threads.chain(http_threads).collect::<Vec<_>>() {
+            println!("4.1");
         thread.join().unwrap();
     }
     // rustls_thread.join().unwrap();
