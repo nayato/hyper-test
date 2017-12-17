@@ -22,6 +22,7 @@ url = "*"
 net2 = "0.2"
 tokio-rustls = "*"
 tokio-tls = "*"
+httpdate = "*"
 
 [profile.release]
 debug = true

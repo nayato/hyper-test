@@ -19,6 +19,7 @@ extern crate url;
 extern crate tk_http;
 extern crate tk_listen;
 extern crate time;
+extern crate httpdate;
 
 use futures::prelude::*;
 use futures::future;

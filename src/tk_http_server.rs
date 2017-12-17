@@ -29,13 +29,13 @@ pub fn service<S>(req: Request, mut e: Encoder<S>) -> FutureResult<EncoderDone<S
             let content = get_content_bytes(&uri);
             e.add_length(content.len() as u64).unwrap();
             e.add_header("Content-Type", "text/plain").unwrap();
-            e.format_header("Date", time::now_utc().rfc822()).unwrap();
+            e.format_header("Date", ::httpdate::fmt_http_date(::std::time::SystemTime::now())).unwrap(); //time::now_utc().rfc822()).unwrap();
             e.add_header("Server", "tk_http").unwrap();
             if e.done_headers().unwrap() {
                 e.write_body(content);
             }
         }
-        ("GET", "/") => {
+        ("GET", "/plaintex2") | ("GET", "/") => {
             e.status(Status::Ok);
             let content = get_content_bytes(&uri);
             e.add_length(content.len() as u64).unwrap();
